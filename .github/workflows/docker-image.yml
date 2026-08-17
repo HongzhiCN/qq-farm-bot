@@ -27,5 +27,5 @@ jobs:
         with:
           context: .
           push: true
-          # 关键！toLowerCase()把用户名强制转小写
-          tags: ghcr.io/${{ github.repository_owner | toLowerCase }}/qq-farm-bot:latest
+          # 直接写小写 hongzhicn，GHCR强制小写
+          tags: ghcr.io/hongzhicn/qq-farm-bot:latest
