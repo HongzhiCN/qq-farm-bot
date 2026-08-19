@@ -1,9 +1,9 @@
+import type { AccountConfig, AutomationConfig, BagSeedFallbackStrategy, FertilizerLandType, GlobalConfig, IntervalConfig, OfflineReminder, PlantingStrategy, QuietHoursConfig } from '../../types/config';
 export {};
-import type { AccountConfig, PlantingStrategy, BagSeedFallbackStrategy, FertilizerLandType, IntervalConfig, OfflineReminder, AutomationConfig, QuietHoursConfig, GlobalConfig } from '../../types/config';
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { DEFAULT_CLIENT_VERSION } = require('../../config/config');
+const { DEFAULT_CLIENT_VERSION, DEFAULT_TIME_ZONE, normalizeTimeZone } = require('../../config/config');
 const { getDataFile, ensureDataDir } = require('../../config/runtime-paths');
 const { readTextFile, readJsonFile, writeJsonFileAtomic } = require('../../services/json-db');
 
@@ -25,7 +25,7 @@ const FERTILIZER_LAND_TYPE_SET: Set<string> = new Set(DEFAULT_FERTILIZER_LAND_TY
 const INTERVAL_MAX_SEC: number = 86400;
 const DEFAULT_KNOWN_FRIEND_GID_SYNC_COOLDOWN_SEC: number = 300;
 const DEFAULT_FRIENDS_LIST_CACHE_TTL_SEC: number = 60;
-const PREVIOUS_DEFAULT_CLIENT_VERSION: string = '1.13.0.5_20260723';
+const PREVIOUS_DEFAULT_CLIENT_VERSION: string = '1.13.2.8_20260723';
 let systemConfigMigrated: boolean = false;
 
 const DEFAULT_OFFLINE_REMINDER: OfflineReminder = {
@@ -434,6 +434,7 @@ function loadGlobalConfig(): void {
                     clientVersion: deviceClientVersion,
                     platform: String(data.systemConfig.platform || 'qq').trim(),
                     os: deviceOs,
+                    timeZone: normalizeTimeZone(data.systemConfig.timeZone || DEFAULT_TIME_ZONE),
                     deviceInfo: {
                         os: deviceOs,
                         clientVersion: deviceClientVersion,
@@ -445,7 +446,8 @@ function loadGlobalConfig(): void {
                     },
                 };
                 systemConfigMigrated = savedTopVersion !== deviceClientVersion
-                    || savedDeviceVersion !== deviceClientVersion;
+                    || savedDeviceVersion !== deviceClientVersion
+                    || data.systemConfig.timeZone !== normalizedSystemConfig.timeZone;
                 globalConfig.systemConfig = normalizedSystemConfig;
             }
         }

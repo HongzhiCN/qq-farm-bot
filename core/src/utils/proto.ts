@@ -50,6 +50,8 @@ async function loadProto(): Promise<void> {
         getResourcePath('proto', 'rechargebonuspb.proto'),
         getResourcePath('proto', 'uicproxypb.proto'),
         getResourcePath('proto', 'mutantpb.proto'),
+        getResourcePath('proto', 'miscpb.proto'),
+        getResourcePath('proto', 'achievepb.proto'),
     ], { keepCase: true });
 
     // 网关
@@ -110,9 +112,14 @@ async function loadProto(): Promise<void> {
     types.SellRequest = root.lookupType('gamepb.itempb.SellRequest');
     types.SellReply = root.lookupType('gamepb.itempb.SellReply');
     types.UseRequest = root.lookupType('gamepb.itempb.UseRequest');
+    types.UseTarget = root.lookupType('gamepb.itempb.UseTarget');
     types.UseReply = root.lookupType('gamepb.itempb.UseReply');
     types.BatchUseRequest = root.lookupType('gamepb.itempb.BatchUseRequest');
     types.BatchUseReply = root.lookupType('gamepb.itempb.BatchUseReply');
+    types.LockItemsRequest = root.lookupType('gamepb.itempb.LockItemsRequest');
+    types.LockItemsReply = root.lookupType('gamepb.itempb.LockItemsReply');
+    types.UnlockItemsRequest = root.lookupType('gamepb.itempb.UnlockItemsRequest');
+    types.UnlockItemsReply = root.lookupType('gamepb.itempb.UnlockItemsReply');
     types.PlantRequest = root.lookupType('gamepb.plantpb.PlantRequest');
     types.PlantReply = root.lookupType('gamepb.plantpb.PlantReply');
 
@@ -141,10 +148,12 @@ async function loadProto(): Promise<void> {
     types.GetActiveNPCReply = root.lookupType('gamepb.mysteryshoppb.GetActiveNPCReply');
     types.ActiveMysteryShopNPC = root.lookupType('gamepb.mysteryshoppb.ActiveNPC');
     types.MysteryShopBuyRequest = root.lookupType('gamepb.mysteryshoppb.BuyRequest');
-    types.GetDailyGiftStatusRequest = root.lookupType('gamepb.qqvippb.GetDailyGiftStatusRequest');
-    types.GetDailyGiftStatusReply = root.lookupType('gamepb.qqvippb.GetDailyGiftStatusReply');
-    types.ClaimDailyGiftRequest = root.lookupType('gamepb.qqvippb.ClaimDailyGiftRequest');
-    types.ClaimDailyGiftReply = root.lookupType('gamepb.qqvippb.ClaimDailyGiftReply');
+    types.GetQQVipRewardsStatusRequest = root.lookupType('gamepb.qqvippb.GetQQVipRewardsStatusRequest');
+    types.GetQQVipRewardsStatusReply = root.lookupType('gamepb.qqvippb.GetQQVipRewardsStatusReply');
+    types.RefreshVipInfoRequest = root.lookupType('gamepb.qqvippb.RefreshVipInfoRequest');
+    types.RefreshVipInfoReply = root.lookupType('gamepb.qqvippb.RefreshVipInfoReply');
+    types.ClaimQQVipRewardsRequest = root.lookupType('gamepb.qqvippb.ClaimQQVipRewardsRequest');
+    types.ClaimQQVipRewardsReply = root.lookupType('gamepb.qqvippb.ClaimQQVipRewardsReply');
     types.CheckCanShareRequest = root.lookupType('gamepb.sharepb.CheckCanShareRequest');
     types.CheckCanShareReply = root.lookupType('gamepb.sharepb.CheckCanShareReply');
     types.ReportShareRequest = root.lookupType('gamepb.sharepb.ReportShareRequest');
@@ -218,6 +227,10 @@ async function loadProto(): Promise<void> {
     // 活动中心
     types.ActivityListRequest = root.lookupType('gamepb.activitypb.ActivityListRequest');
     types.ActivityListReply = root.lookupType('gamepb.activitypb.ActivityListReply');
+    types.SetSplashedRequest = root.lookupType('gamepb.activitypb.SetSplashedRequest');
+    types.SetSplashedReply = root.lookupType('gamepb.activitypb.SetSplashedReply');
+    types.GetGroupRequest = root.lookupType('gamepb.activitypb.GetGroupRequest');
+    types.GetGroupReply = root.lookupType('gamepb.activitypb.GetGroupReply');
     types.QueryActivityRequest = root.lookupType('gamepb.activitypb.QueryActivityRequest');
     types.ExchangeShopOperateParams = root.lookupType('gamepb.activitypb.ExchangeShopOperateParams');
     types.ExchangeShopRequest = root.lookupType('gamepb.activitypb.ExchangeShopRequest');
@@ -226,6 +239,8 @@ async function loadProto(): Promise<void> {
     types.StartQingMeiBrewRequest = root.lookupType('gamepb.activitypb.StartQingMeiBrewRequest');
     types.ContinueQingMeiBrewRequest = root.lookupType('gamepb.activitypb.ContinueQingMeiBrewRequest');
     types.SettleQingMeiBrewRequest = root.lookupType('gamepb.activitypb.SettleQingMeiBrewRequest');
+    types.ClaimQixiBridgeRewardsRequest = root.lookupType('gamepb.activitypb.ClaimQixiBridgeRewardsRequest');
+    types.GiftQixiSachetRequest = root.lookupType('gamepb.activitypb.GiftQixiSachetRequest');
     types.ActivityOperateReply = root.lookupType('gamepb.activitypb.ActivityOperateReply');
     types.GetSeasonInfoRequest = root.lookupType('gamepb.seasonpb.GetSeasonInfoRequest');
     types.GetSeasonInfoReply = root.lookupType('gamepb.seasonpb.GetSeasonInfoReply');
@@ -234,6 +249,8 @@ async function loadProto(): Promise<void> {
     types.BattlePassChangeNotify = root.lookupType('gamepb.seasonpb.BattlePassChangeNotify');
     types.GetSolarTermsRequest = root.lookupType('gamepb.solartermspb.GetSolarTermsRequest');
     types.GetSolarTermsReply = root.lookupType('gamepb.solartermspb.GetSolarTermsReply');
+    types.GetSolarTermsRedDotRequest = root.lookupType('gamepb.solartermspb.GetSolarTermsRedDotRequest');
+    types.GetSolarTermsRedDotReply = root.lookupType('gamepb.solartermspb.GetSolarTermsRedDotReply');
     types.ClaimSolarTermsRequest = root.lookupType('gamepb.solartermspb.ClaimSolarTermsRequest');
     types.ClaimSolarTermsReply = root.lookupType('gamepb.solartermspb.ClaimSolarTermsReply');
 
@@ -262,12 +279,17 @@ async function loadProto(): Promise<void> {
     // 狗狗
     types.GetDogInfoRequest = root.lookupType('gamepb.dogpb.GetDogInfoRequest');
     types.GetDogInfoReply = root.lookupType('gamepb.dogpb.GetDogInfoReply');
+    types.ClaimSkillGiftsRequest = root.lookupType('gamepb.dogpb.ClaimSkillGiftsRequest');
+    types.ClaimSkillGiftsReply = root.lookupType('gamepb.dogpb.ClaimSkillGiftsReply');
+    types.PendingGiftCountNotify = root.lookupType('gamepb.dogpb.PendingGiftCountNotify');
 
     // 皮肤
     types.SkinsOwnedRequest = root.lookupType('gamepb.skinpb.SkinsOwnedRequest');
     types.SkinsOwnedReply = root.lookupType('gamepb.skinpb.SkinsOwnedReply');
     types.SkinsEquippedRequest = root.lookupType('gamepb.skinpb.SkinsEquippedRequest');
     types.SkinsEquippedReply = root.lookupType('gamepb.skinpb.SkinsEquippedReply');
+    types.GetSkinEffectTypeParamsRequest = root.lookupType('gamepb.skinpb.GetSkinEffectTypeParamsRequest');
+    types.GetSkinEffectTypeParamsReply = root.lookupType('gamepb.skinpb.GetSkinEffectTypeParamsReply');
 
     // 头像框
     types.AvatarFramesOwnedRequest = root.lookupType('gamepb.avatarframepb.AvatarFramesOwnedRequest');
@@ -286,8 +308,6 @@ async function loadProto(): Promise<void> {
     types.GetRechargeInfoRequest = root.lookupType('gamepb.paypb.GetRechargeInfoRequest');
     types.GetRechargeInfoReply = root.lookupType('gamepb.paypb.GetRechargeInfoReply');
     types.RechargeInfo = root.lookupType('gamepb.paypb.RechargeInfo');
-    types.RechargeInfoNotify = root.lookupType('gamepb.paypb.RechargeInfoNotify');
-
     // 充值奖励
     types.GetRechargeBonusConfigRequest = root.lookupType('gamepb.rechargebonuspb.GetConfigRequest');
     types.GetRechargeBonusConfigReply = root.lookupType('gamepb.rechargebonuspb.GetConfigReply');
@@ -314,16 +334,24 @@ async function loadProto(): Promise<void> {
     types.GetBulletinDetailRequest = root.lookupType('gamepb.bulletinboardpb.GetBulletinDetailRequest');
     types.GetBulletinDetailReply = root.lookupType('gamepb.bulletinboardpb.GetBulletinDetailReply');
 
+    // Misc
+    types.GetFollowGiftStatusRequest = root.lookupType('gamepb.miscpb.GetFollowGiftStatusRequest');
+    types.GetFollowGiftStatusReply = root.lookupType('gamepb.miscpb.GetFollowGiftStatusReply');
+
     // 分享（补充）
     types.GetInviteAwardRequest = root.lookupType('gamepb.sharepb.GetInviteAwardRequest');
     types.GetInviteAwardReply = root.lookupType('gamepb.sharepb.GetInviteAwardReply');
 
     // 通知
     types.ItemNotify = root.lookupType('gamepb.itempb.ItemNotify');
+    types.ItemUseDailyNotify = root.lookupType('gamepb.itempb.ItemUseDailyNotify');
     types.GoodsUnlockNotify = root.lookupType('gamepb.shoppb.GoodsUnlockNotify');
     types.TaskInfoNotify = root.lookupType('gamepb.taskpb.TaskInfoNotify');
     types.NeedNotify = root.lookupType('gamepb.mallpb.NeedNotify');
     types.VipInfoUpdatedNTF = root.lookupType('gamepb.qqvippb.VipInfoUpdatedNTF');
+    types.AvatarFrameRedDotNotify = root.lookupType('gamepb.avatarframepb.AvatarFrameRedDotNotify');
+    types.RechargeInfoNotify = root.lookupType('gamepb.paypb.RechargeInfoNotify');
+    types.AchieveRedDotNotify = root.lookupType('gamepb.achievepb.AchieveRedDotNotify');
     types.ProductsHasChangedNotify = root.lookupType('gamepb.mallpb.ProductsHasChangedNotify');
     types.ActiviesChangeNotify = root.lookupType('gamepb.activitypb.ActiviesChangeNotify');
     types.SkinChangeNotify = root.lookupType('gamepb.skinpb.SkinChangeNotify');

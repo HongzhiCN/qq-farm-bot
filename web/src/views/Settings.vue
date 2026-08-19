@@ -2,7 +2,7 @@
 import { NButton, NCheckbox, NCheckboxGroup, NTab, NTabs, NTimePicker } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import AccountModal from '@/components/AccountModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
@@ -16,6 +16,7 @@ import { useStatusStore } from '@/stores/status'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const route = useRoute()
 const accountStore = useAccountStore()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
@@ -23,12 +24,28 @@ const statusStore = useStatusStore()
 
 type SettingsTab = 'account' | 'strategy' | 'automation' | 'system'
 const storedTab = localStorage.getItem('settings-active-tab')
-const activeTab = ref<SettingsTab>(storedTab === 'user' ? 'system' : (storedTab as SettingsTab) || 'account')
+const settingsTabKeys: SettingsTab[] = ['account', 'strategy', 'automation', 'system']
+const queryTab = String(route.query.tab || '')
+const initialTab = settingsTabKeys.includes(queryTab as SettingsTab)
+  ? queryTab as SettingsTab
+  : storedTab === 'user' ? 'system' : (storedTab as SettingsTab) || 'account'
+const activeTab = ref<SettingsTab>(initialTab)
 const chevronUpIconClass = 'i-carbon-chevron-up'
 const chevronDownIconClass = 'i-carbon-chevron-down'
 
 watch(activeTab, (newTab) => {
   localStorage.setItem('settings-active-tab', newTab)
+  if (String(route.query.tab || '') !== newTab) {
+    router.replace({
+      query: { ...route.query, tab: newTab },
+    })
+  }
+})
+
+watch(() => route.query.tab, (value) => {
+  const nextTab = String(value || '')
+  if (settingsTabKeys.includes(nextTab as SettingsTab) && nextTab !== activeTab.value)
+    activeTab.value = nextTab as SettingsTab
 })
 
 const tabs = [
@@ -1089,6 +1106,7 @@ const localSystemConfig = ref({
   clientVersion: '',
   platform: 'qq',
   os: 'Windows',
+  timeZone: 'Asia/Shanghai',
   deviceInfo: { ...defaultDeviceInfo },
 })
 const defaultSystemConfig = ref({
@@ -1096,10 +1114,14 @@ const defaultSystemConfig = ref({
   clientVersion: '',
   platform: 'qq',
   os: 'Windows',
+  timeZone: 'Asia/Shanghai',
   deviceInfo: { ...defaultDeviceInfo },
 })
 const devicePresets = ref<any[]>([])
 const selectedPresetId = ref('')
+const timeZoneOptions = ref([
+  { label: '北京时间 / 上海（UTC+8）', value: 'Asia/Shanghai' },
+])
 const platformOptions = [
   { label: 'QQ', value: 'qq' },
   { label: '微信', value: 'wx' },
@@ -1116,6 +1138,7 @@ function normalizeSystemConfig(source: any, fallback: any) {
     clientVersion: source?.clientVersion || '',
     platform: source?.platform || 'qq',
     os: source?.os || 'Windows',
+    timeZone: source?.timeZone || fallback.timeZone || 'Asia/Shanghai',
     deviceInfo: source?.deviceInfo ? { ...fallback.deviceInfo, ...source.deviceInfo } : { ...fallback.deviceInfo },
   }
 }
@@ -1150,6 +1173,12 @@ async function loadSystemConfig() {
   try {
     const { data } = await api.get('/api/settings/system-config')
     if (data?.ok) {
+      if (Array.isArray(data.data.timeZones) && data.data.timeZones.length) {
+        timeZoneOptions.value = data.data.timeZones.map((option: any) => ({
+          label: String(option.label || option.value || ''),
+          value: String(option.value || 'Asia/Shanghai'),
+        }))
+      }
       defaultSystemConfig.value = normalizeSystemConfig(data.data.default, defaultSystemConfig.value)
       localSystemConfig.value = normalizeSystemConfig(data.data.saved || data.data.default, defaultSystemConfig.value)
     }
@@ -1857,6 +1886,17 @@ async function handleResetSystemConfig() {
                   type="text"
                   placeholder="wss://..."
                 />
+
+                <div>
+                  <BaseSelect
+                    v-model="localSystemConfig.timeZone"
+                    label="系统时区"
+                    :options="timeZoneOptions"
+                  />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    每日礼包、好友额度、任务统计、安静时段和日志时间均以此时区为准；推荐使用北京时间 / 上海。
+                  </p>
+                </div>
 
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div class="flex flex-col gap-1.5">

@@ -5,7 +5,7 @@
 const { CONFIG } = require('../../config/config');
 const crypto = require('node:crypto');
 const { getUserState, networkEvents } = require('../../utils/network');
-const { toNum, getServerTimeSec, log, logWarn, randomDelay } = require('../../utils/utils');
+const { toNum, getSystemDateKey, log, logWarn, randomDelay } = require('../../utils/utils');
 const { getDataFile } = require('../../config/runtime-paths');
 const { createScheduler } = require('../scheduler');
 const { readJsonFile, writeJsonFileAtomic } = require('../json-db');
@@ -64,16 +64,6 @@ const OP_NAMES: Record<number, string> = {
 
 // ============ 操作限制相关 ============
 
-function getBeijingDateKey(): string {
-    const nowSec: number = getServerTimeSec();
-    const nowMs: number = nowSec > 0 ? nowSec * 1000 : Date.now();
-    const bjDate: Date = new Date(nowMs + 8 * 3600 * 1000);
-    const y: number = bjDate.getUTCFullYear();
-    const m: string = String(bjDate.getUTCMonth() + 1).padStart(2, '0');
-    const d: string = String(bjDate.getUTCDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
 function getBadDailyStateFile(): string {
     const accountId: string = String(process.env.FARM_ACCOUNT_ID || 'default');
     const token: string = crypto.createHash('sha256').update(accountId, 'utf8').digest('hex');
@@ -99,7 +89,7 @@ function persistBadDailyStop(today: string): void {
  * 检查是否需要重置每日限制 (0点刷新)
  */
 export function checkDailyReset(): void {
-    const today: string = getBeijingDateKey();
+    const today: string = getSystemDateKey();
     if (lastResetDate !== today) {
         if (lastResetDate !== '') {
             log('系统', '跨日重置，清空操作限制缓存');
@@ -129,7 +119,7 @@ export function markBadOperationLimitReached(method: string = ''): boolean {
     if (badOperationLimitReached) return false;
     badOperationLimitReached = true;
     try {
-        persistBadDailyStop(lastResetDate || getBeijingDateKey());
+        persistBadDailyStop(lastResetDate || getSystemDateKey());
     } catch (e: any) {
         logWarn('好友', `保存当日捣乱停用状态失败: ${e.message}`);
     }
@@ -443,7 +433,7 @@ export async function checkFriends(options: CheckFriendsOptions = {}): Promise<b
 
                     try {
                         await visitFriend(friend, totalActions, state.gid, state.accountId);
-                    } catch (e: any) {
+                    } catch {
                         // 单个好友失败不影响整体
                     }
                     if (isBadOperationLimitReached()) break;
@@ -580,13 +570,11 @@ async function acceptFriendsWithRetry(gids: number[]): Promise<void> {
 
 export async function runBadOnceOnStartup(): Promise<void> {
     if (badExecutedOnStartup) {
-       // log('好友', '启动时放虫放草已执行过，跳过', { module: 'friend', event: '启动放虫放草跳过' });
         return;
     }
 
     const autoBadEnabled: boolean = isAutomationOn('friend_bad');
     if (!autoBadEnabled) {
-      //  log('好友', '放虫放草功能未开启，跳过', { module: 'friend', event: '放虫放草未开启' });
         return;
     }
 
@@ -598,6 +586,12 @@ export async function runBadOnceOnStartup(): Promise<void> {
 
     const accountId: string = process.env.FARM_ACCOUNT_ID || '';
     if (isBadOperationLimitReached()) return;
+
+    if (isCheckingFriends) {
+        friendScheduler.setTimeoutTask('bad_startup_once_retry', 5000, () => runBadOnceOnStartup());
+        return;
+    }
+    isCheckingFriends = true;
 
     log('好友', '========== 启动时放虫放草开始 ==========', { module: 'friend', event: '启动放虫放草开始' });
 
@@ -680,6 +674,8 @@ export async function runBadOnceOnStartup(): Promise<void> {
 
     } catch (err: any) {
         logWarn('好友', `启动时放虫放草异常: ${err.message}`);
+    } finally {
+        isCheckingFriends = false;
     }
 }
 
