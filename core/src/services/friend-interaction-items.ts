@@ -31,7 +31,7 @@ const MAX_SIGNED_INT64 = 9223372036854775807n;
  * 因此这里逐个登记，而不是按 interaction_type 放行。
  */
 const SELF_USABLE_INTERACTION_ITEM_IDS: Set<number> = new Set([
-    301103, // 鹊羽灵露
+    301103, // 七夕活动土地道具，展示名称由 ItemInfo 提供。
 ]);
 
 class FriendInteractionBusinessError extends Error {
@@ -207,7 +207,7 @@ async function getFriendInteractionItems(): Promise<any> {
         serverValidationRequired: true,
         confirmationRequired: true,
         message: inventory.items.length > 0
-            ? '特殊互动道具由服务端在实际使用时最终校验'
+            ? '请选择好友农场中符合条件的土地使用'
             : '背包中暂无可用于好友土地的特殊互动道具',
     };
 }
@@ -221,7 +221,7 @@ async function getSelfInteractionItems(): Promise<any> {
         serverValidationRequired: true,
         confirmationRequired: true,
         message: items.length > 0
-            ? '可对自己农场使用的道具由服务端在实际使用时最终校验'
+            ? '请选择自己农场中符合条件的土地使用'
             : '背包中暂无可对自己农场使用的特殊互动道具',
     };
 }
@@ -305,11 +305,7 @@ function normalizeReplyItems(itemsInput: any[]): any[] {
 }
 
 function interactionItemName(itemId: number, info: any): string {
-    return String(info?.name || ({
-        301101: '黄金虫',
-        301102: '足球',
-        301103: '鹊羽灵露',
-    } as Record<number, string>)[itemId] || `道具${itemId}`);
+    return String(info?.name || getItemById(itemId)?.name || `道具${itemId}`);
 }
 
 function normalizeUpdatedLand(rawLand: any, target: any = null, friendMode: boolean = true): any | null {
@@ -342,6 +338,7 @@ function buildConfirmedInteractionEffects(
     landId: string,
     itemName: string,
 ): any[] {
+    const itemActivityId = toNum(getItemById(itemId)?.activity_id);
     const protocolEffects = typeof getPlantInteractionEffects === 'function'
         ? getPlantInteractionEffects(rawLand?.plant)
         : [];
@@ -355,6 +352,7 @@ function buildConfirmedInteractionEffects(
             landId: String(effect.landId || landId),
             itemId: String(effect.itemId || itemId),
             itemName: String(effect.itemName || itemName),
+            activityId: toNum(effect.activityId) || itemActivityId,
             plantId: int64String(rawLand?.plant?.id),
             confirmed: true,
         }));
@@ -364,6 +362,7 @@ function buildConfirmedInteractionEffects(
         landId: String(landId),
         itemId: String(itemId),
         itemName,
+        activityId: itemActivityId,
         plantId: int64String(rawLand?.plant?.id),
         effectType: 0,
         confirmed: true,
