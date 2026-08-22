@@ -20,6 +20,13 @@ export interface AutomationConfig {
   fertilizer_gift?: boolean
   fertilizer_buy_organic?: boolean
   fertilizer_buy_normal?: boolean
+  mystery_shop_auto_buy?: boolean
+  mystery_shop_allow_gold?: boolean
+  mystery_shop_allow_coupon?: boolean
+  mystery_shop_allow_gold_bean?: boolean
+  mystery_shop_allow_diamond?: boolean
+  mystery_shop_arrival_notify?: boolean
+  mystery_shop_purchase_notify?: boolean
   skip_own_weed_bug?: boolean
 }
 
@@ -40,6 +47,7 @@ export interface FriendQuietHoursConfig {
   enabled?: boolean
   start?: string
   end?: string
+  continueFarm?: boolean
 }
 
 export interface OfflineConfig {
@@ -120,7 +128,7 @@ function createDefaultSettings(): SettingsState {
     bagSeedPriority: [],
     bagSeedFallbackStrategy: 'level',
     intervals: {},
-    friendQuietHours: { enabled: false, start: '23:00', end: '07:00' },
+    friendQuietHours: { enabled: false, start: '23:00', end: '07:00', continueFarm: true },
     automation: {},
     ui: {},
     offlineReminder: {
@@ -175,7 +183,10 @@ export const useSettingStore = defineStore('setting', () => {
       bagSeedPriority: cloneValue(data.bagSeedPriority ?? defaults.bagSeedPriority),
       bagSeedFallbackStrategy: data.bagSeedFallbackStrategy ?? defaults.bagSeedFallbackStrategy,
       intervals: cloneValue(data.intervals || defaults.intervals),
-      friendQuietHours: cloneValue(data.friendQuietHours || defaults.friendQuietHours),
+      friendQuietHours: {
+        ...defaults.friendQuietHours,
+        ...(cloneValue(data.friendQuietHours) || {}),
+      },
       automation: cloneValue(data.automation || defaults.automation),
       ui: cloneValue(data.ui || defaults.ui),
       offlineReminder: {
