@@ -283,11 +283,13 @@ interface BagSeedItem {
   count: number
   requiredLevel: number
   plantSize: number
+  image?: string
 }
 
 const bagSeeds = ref<BagSeedItem[]>([])
 const bagSeedsLoading = ref(false)
 const bagSeedsError = ref<string | null>(null)
+const bagSeedImageErrors = ref<Record<number, boolean>>({})
 const draggingBagSeedId = ref<number | null>(null)
 
 const visibleBagSeedIds = computed(() => bagSeeds.value.map(seed => seed.seedId))
@@ -793,6 +795,7 @@ const localAutomationSettings = ref({
     task: false,
     sell: true,
     friend: false,
+    friend_auto_accept: true,
     farm_push: false,
     land_upgrade: true,
     friend_steal: false,
@@ -820,6 +823,11 @@ const localAutomationSettings = ref({
   fertilizerBuyNormalCount: 10,
   fertilizerBuyNormalThresholdHours: 10,
   fertilizerBuyCheckIntervalMinutes: 30,
+  autoAcceptFriendMinLevel: 0,
+  autoAcceptRequireOwnLevel: false,
+  autoAcceptHarvestStealEnabled: true,
+  autoAcceptHarvestStealHarvest: 8,
+  autoAcceptHarvestStealSteal: 1,
 })
 
 const fertilizerOptions = [
@@ -838,6 +846,7 @@ function syncLocalAutomationSettings() {
         task: false,
         sell: false,
         friend: false,
+        friend_auto_accept: true,
         farm_push: false,
         land_upgrade: false,
         friend_steal: false,
@@ -867,6 +876,7 @@ function syncLocalAutomationSettings() {
         task: false,
         sell: false,
         friend: false,
+        friend_auto_accept: true,
         farm_push: false,
         land_upgrade: false,
         friend_steal: false,
@@ -903,6 +913,11 @@ function syncLocalAutomationSettings() {
     localAutomationSettings.value.fertilizerBuyNormalCount = settings.value.fertilizerBuyNormalCount ?? 10
     localAutomationSettings.value.fertilizerBuyNormalThresholdHours = settings.value.fertilizerBuyNormalThresholdHours ?? 10
     localAutomationSettings.value.fertilizerBuyCheckIntervalMinutes = settings.value.fertilizerBuyCheckIntervalMinutes ?? 30
+    localAutomationSettings.value.autoAcceptFriendMinLevel = settings.value.autoAcceptFriendMinLevel ?? 0
+    localAutomationSettings.value.autoAcceptRequireOwnLevel = settings.value.autoAcceptRequireOwnLevel ?? false
+    localAutomationSettings.value.autoAcceptHarvestStealEnabled = settings.value.autoAcceptHarvestStealEnabled ?? true
+    localAutomationSettings.value.autoAcceptHarvestStealHarvest = settings.value.autoAcceptHarvestStealHarvest ?? 8
+    localAutomationSettings.value.autoAcceptHarvestStealSteal = settings.value.autoAcceptHarvestStealSteal ?? 1
   }
 }
 
@@ -1623,6 +1638,17 @@ async function handleResetSystemConfig() {
                   >
                     <div class="h-9 w-9 flex shrink-0 items-center justify-center rounded-lg bg-amber-100 text-xs text-amber-700 font-bold dark:bg-amber-900/50 dark:text-amber-300">
                       {{ index + 1 }}
+                    </div>
+                    <div class="h-9 w-9 flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-amber-50 dark:bg-gray-700">
+                      <img
+                        v-if="seed.image && !bagSeedImageErrors[seed.seedId]"
+                        :src="seed.image"
+                        :alt="`${seed.name}种子`"
+                        class="h-9 w-9 object-contain"
+                        loading="lazy"
+                        @error="bagSeedImageErrors[seed.seedId] = true"
+                      >
+                      <span v-else class="i-carbon-sprout text-lg text-amber-500 dark:text-amber-300" />
                     </div>
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-1.5">
