@@ -37,6 +37,7 @@ const {
     putWeedsDetailed,
 } = require('./api');
 const {
+    extractReplyFriends,
     postToMaster,
     removeKnownFriendGid,
 } = require('./gid-manager');
@@ -51,6 +52,17 @@ function schedulerRef(): any {
 // ============ 内部状态 ============
 let friendsListCache: any[] | null = null;
 let friendsListCacheTime: number = 0;
+
+const PROTECT_DOG_ID = 90021;
+
+function isProtectDog(dogInfo: any): boolean {
+    return toNum(dogInfo && (dogInfo.dog_id ?? dogInfo.dogId)) === PROTECT_DOG_ID;
+}
+
+function canBypassHelpExpLimitForProtectDog(enterReply: any): boolean {
+    return !!isAutomationOn('friend_help_protect_dog_ignore_exp_limit')
+        && isProtectDog(enterReply && (enterReply.brief_dog_info ?? enterReply.briefDogInfo));
+}
 
 interface FarmingOutcome {
     effect: 'confirmed' | 'noop' | 'uncertain';
@@ -361,49 +373,51 @@ export function analyzeFriendLands(lands: any[], myGid: number, friendName: stri
 /**
  * 获取好友列表 (供面板)
  */
-export async function getFriendsList(forceSync: boolean = false): Promise<any[]> {
+export function cacheFriendsListFromReply(reply: any): any[] {
+    const state: any = getUserState();
+    const result: any[] = extractReplyFriends(reply)
+        .filter((f: any) => toNum(f.gid) !== state.gid && f.name !== '小小农夫' && f.remark !== '小小农夫')
+        .map((f: any) => ({
+            gid: toNum(f.gid),
+            name: f.remark || f.name || `GID:${toNum(f.gid)}`,
+            avatarUrl: String(f.avatar_url || '').trim(),
+            level: toNum(f.level),
+            gold: toNum(f.gold),
+            plant: f.plant ? {
+                stealNum: toNum(f.plant.steal_plant_num),
+                dryNum: toNum(f.plant.dry_num),
+                weedNum: toNum(f.plant.weed_num),
+                insectNum: toNum(f.plant.insect_num),
+            } : null,
+        }))
+        .sort((a: any, b: any) => {
+            // 固定顺序：先按名称，再按 GID，避免刷新时顺序抖动
+            const an: string = String(a.name || '');
+            const bn: string = String(b.name || '');
+            const byName: number = an.localeCompare(bn, 'zh-CN');
+            if (byName !== 0) return byName;
+            return Number(a.gid || 0) - Number(b.gid || 0);
+        });
+
+    friendsListCache = result;
+    friendsListCacheTime = Date.now();
+    return result;
+}
+
+export async function getFriendsList(forceSync: boolean = false, priority: 'low' | 'normal' = 'normal'): Promise<any[]> {
     try {
         // 检查缓存
         const now: number = Date.now();
         if (!forceSync && friendsListCache && (now - friendsListCacheTime) < getFriendsListCacheTtlMs()) {
-
-            return friendsListCache;
+            return friendsListCache.map((friend: any) => ({ ...friend }));
         }
 
         log('好友', '开始获取好友列表', {
             module: 'friend',
             event: '获取好友列表',
         });
-        const reply: any = await getAllFriends(forceSync);
-        const friends: any[] = reply.game_friends || [];
-        const state: any = getUserState();
-        const result: any[] = friends
-            .filter((f: any) => toNum(f.gid) !== state.gid && f.name !== '小小农夫' && f.remark !== '小小农夫')
-            .map((f: any) => ({
-                gid: toNum(f.gid),
-                name: f.remark || f.name || `GID:${toNum(f.gid)}`,
-                avatarUrl: String(f.avatar_url || '').trim(),
-                level: toNum(f.level),
-                gold: toNum(f.gold),
-                plant: f.plant ? {
-                    stealNum: toNum(f.plant.steal_plant_num),
-                    dryNum: toNum(f.plant.dry_num),
-                    weedNum: toNum(f.plant.weed_num),
-                    insectNum: toNum(f.plant.insect_num),
-                } : null,
-            }))
-            .sort((a: any, b: any) => {
-                // 固定顺序：先按名称，再按 GID，避免刷新时顺序抖动
-                const an: string = String(a.name || '');
-                const bn: string = String(b.name || '');
-                const byName: number = an.localeCompare(bn, 'zh-CN');
-                if (byName !== 0) return byName;
-                return Number(a.gid || 0) - Number(b.gid || 0);
-            });
-
-        // 更新缓存
-        friendsListCache = result;
-        friendsListCacheTime = now;
+        const reply: any = await getAllFriends(forceSync, priority);
+        const result: any[] = cacheFriendsListFromReply(reply);
 
         log('好友', `获取好友列表成功，共 ${result.length} 位好友`, {
             module: 'friend',
@@ -421,6 +435,11 @@ export async function getFriendsList(forceSync: boolean = false): Promise<any[]>
         });
         return [];
     }
+}
+
+export function getFriendsListCacheOnly(): any[] {
+    if (!Array.isArray(friendsListCache)) return [];
+    return friendsListCache.map((friend: any) => ({ ...friend }));
 }
 
 /**
@@ -706,15 +725,17 @@ export async function visitFriend(friend: any, totalActions: any, myGid: number,
     // 1. 帮助操作 (除草/除虫/浇水)
     const helpEnabled: boolean = !!isAutomationOn('friend_help');
     const stopWhenExpLimit: boolean = !!isAutomationOn('friend_help_exp_limit');
+    const protectDogBypass: boolean = canBypassHelpExpLimitForProtectDog(enterReply);
+    const effectiveStopWhenExpLimit: boolean = stopWhenExpLimit && !protectDogBypass;
     if (!stopWhenExpLimit) schedulerRef().setCanGetHelpExp(true);
     if (!helpEnabled) {
         // 自动帮忙关闭，直接跳过帮助操作
-    } else if (stopWhenExpLimit && !schedulerRef().getCanGetHelpExp()) {
+    } else if (effectiveStopWhenExpLimit && !schedulerRef().getCanGetHelpExp()) {
         // 今日已达到经验上限后停止帮忙
     } else {
         const allHelpLandIds: number[] = [...new Set([...status.needWeed, ...status.needBug, ...status.needWater])];
         const allExpIds: number[] = [10005, 10006, 10007];
-        const allowByExp: boolean = (!stopWhenExpLimit) || (schedulerRef().canGetExpByCandidates(allExpIds) && schedulerRef().getCanGetHelpExp());
+        const allowByExp: boolean = (!effectiveStopWhenExpLimit) || (schedulerRef().canGetExpByCandidates(allExpIds) && schedulerRef().getCanGetHelpExp());
         if (allHelpLandIds.length > 0 && allowByExp) {
             const outcome: FarmingOutcome = await runFarmingWithFallback(gid, allHelpLandIds, stopWhenExpLimit, getHelpSnapshotKey(lands));
             if (outcome.landCount > 0) {
@@ -921,7 +942,8 @@ export async function visitFriendForHelp(friend: any, totalActions: any, myGid: 
 
     const stopWhenExpLimit: boolean = !!isAutomationOn('friend_help_exp_limit') && !ignoreExpLimit;
     if (!stopWhenExpLimit) schedulerRef().setCanGetHelpExp(true);
-    if (stopWhenExpLimit && !schedulerRef().getCanGetHelpExp()) {
+    const protectDogBypassEnabled: boolean = !!isAutomationOn('friend_help_protect_dog_ignore_exp_limit');
+    if (stopWhenExpLimit && !schedulerRef().getCanGetHelpExp() && !protectDogBypassEnabled) {
         return { acted: false, entered: false };
     }
 
@@ -946,12 +968,19 @@ export async function visitFriendForHelp(friend: any, totalActions: any, myGid: 
     }
 
     const status: AnalyzeResult = analyzeFriendLands(lands, myGid, name, {});
+    const protectDogBypass: boolean = protectDogBypassEnabled && canBypassHelpExpLimitForProtectDog(enterReply);
+    const effectiveStopWhenExpLimit: boolean = stopWhenExpLimit && !protectDogBypass;
+
+    if (effectiveStopWhenExpLimit && !schedulerRef().getCanGetHelpExp()) {
+        await leaveFriendFarm(gid);
+        return { acted: false, entered: true };
+    }
 
     const actions: string[] = [];
 
     const allHelpLandIds: number[] = [...new Set([...status.needWeed, ...status.needBug, ...status.needWater])];
     const allExpIds: number[] = [10005, 10006, 10007];
-    const allowByExp: boolean = (!stopWhenExpLimit) || (schedulerRef().canGetExpByCandidates(allExpIds) && schedulerRef().getCanGetHelpExp());
+    const allowByExp: boolean = (!effectiveStopWhenExpLimit) || (schedulerRef().canGetExpByCandidates(allExpIds) && schedulerRef().getCanGetHelpExp());
     if (allHelpLandIds.length > 0 && allowByExp) {
         const outcome: FarmingOutcome = await runFarmingWithFallback(gid, allHelpLandIds, stopWhenExpLimit, getHelpSnapshotKey(lands));
         if (outcome.landCount > 0) {
@@ -986,7 +1015,8 @@ export function clearFriendsListCache(): void {
 
 export function removeFriendFromFriendsListCache(friendGid: any): void {
     const gid: number = toNum(friendGid);
-    if (!gid || !Array.isArray(friendsListCache)) return;
+    if (!gid) return;
+    if (!Array.isArray(friendsListCache)) return;
     const next: any[] = friendsListCache.filter((friend: any) => toNum(friend.gid) !== gid);
     if (next.length !== friendsListCache.length) {
         friendsListCache = next;

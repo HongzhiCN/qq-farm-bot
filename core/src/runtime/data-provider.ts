@@ -115,6 +115,7 @@ function createDataProvider(options: DataProviderOptions) {
         getLands: (accountRef: string) => callWorkerApi(resolveAccountRefId(accountRef), 'getLands'),
         getIllustratedSnapshot: (accountRef: string) => callWorkerApi(resolveAccountRefId(accountRef), 'getIllustratedSnapshot'),
         getFriends: (accountRef: string, forceSync = false) => callWorkerApi(resolveAccountRefId(accountRef), 'getFriends', forceSync),
+        getFriendsCache: (accountRef: string) => callWorkerApi(resolveAccountRefId(accountRef), 'getFriendsCache'),
         clearFriendsCache: (accountRef: string) => callWorkerApi(resolveAccountRefId(accountRef), 'clearFriendsCache'),
         getInteractRecords: (accountRef: string) => callWorkerApi(resolveAccountRefId(accountRef), 'getInteractRecords'),
         getFriendLands: (accountRef: string, gid: number) => callWorkerApi(resolveAccountRefId(accountRef), 'getFriendLands', gid),
@@ -206,6 +207,9 @@ function createDataProvider(options: DataProviderOptions) {
         },
 
         doFarmOp: (accountRef: string, opType: string) => callWorkerApi(resolveAccountRefId(accountRef), 'doFarmOp', opType),
+        fertilizeOwnLand: (accountRef: string, landId: unknown, fertilizerType: unknown) => (
+            callWorkerApi(resolveAccountRefId(accountRef), 'fertilizeOwnLand', landId, fertilizerType)
+        ),
 
         doAnalytics: (accountRef: string, sortBy: string) => callWorkerApi(resolveAccountRefId(accountRef), 'getAnalytics', sortBy),
         buyFertilizer: (accountRef: string, type: string, count: number) => callWorkerApi(resolveAccountRefId(accountRef), 'buyFertilizer', type, count),
@@ -218,15 +222,15 @@ function createDataProvider(options: DataProviderOptions) {
             const body = (payload && typeof payload === 'object') ? payload : {};
             const snapshot: Record<string, any> = {};
             const copyIfPresent = (sourceKey: string, targetKey: string = sourceKey): void => {
-                if (Object.prototype.hasOwnProperty.call(body, sourceKey)) {
+                if (Object.hasOwn(body, sourceKey)) {
                     snapshot[targetKey] = body[sourceKey];
                 }
             };
 
             copyIfPresent('plantingStrategy');
-            if (!Object.prototype.hasOwnProperty.call(snapshot, 'plantingStrategy')) copyIfPresent('strategy', 'plantingStrategy');
+            if (!Object.hasOwn(snapshot, 'plantingStrategy')) copyIfPresent('strategy', 'plantingStrategy');
             copyIfPresent('preferredSeedId');
-            if (!Object.prototype.hasOwnProperty.call(snapshot, 'preferredSeedId')) copyIfPresent('seedId', 'preferredSeedId');
+            if (!Object.hasOwn(snapshot, 'preferredSeedId')) copyIfPresent('seedId', 'preferredSeedId');
             for (const key of [
                 'automation',
                 'intervals',
@@ -240,6 +244,7 @@ function createDataProvider(options: DataProviderOptions) {
                 'fertilizerBuyNormalThresholdHours',
                 'fertilizerBuyCheckIntervalMinutes',
                 'bagSeedPriority',
+                'bagSeedLandTypes',
                 'bagSeedFallbackStrategy',
                 'autoAcceptFriendMinLevel',
                 'autoAcceptRequireOwnLevel',

@@ -410,18 +410,24 @@ async function loadData() {
     return
 
   avatarErrorKeys.value.clear()
-  const requests = [
-    friendStore.fetchFriends(accountId),
+  // 登录后的好友页先读 Worker 缓存，再同步主列表，避免一次性向同一账号 Worker 发起多路 RPC。
+  await Promise.allSettled([
+    friendStore.fetchFriendsCache(accountId),
     friendStore.fetchBlacklist(accountId),
+  ])
+  await new Promise(resolve => window.setTimeout(resolve, 250))
+  await friendStore.fetchFriends(accountId)
+  await new Promise(resolve => window.setTimeout(resolve, 250))
+  await Promise.allSettled([
     friendStore.fetchInteractRecords(accountId),
     friendStore.fetchInteractionItems(accountId),
-    activityStore.lazyLoad(accountId),
-  ]
+  ])
+  await new Promise(resolve => window.setTimeout(resolve, 250))
+  const backgroundRequests: Promise<unknown>[] = [activityStore.lazyLoad(accountId)]
   if (isQqAccount.value)
-    requests.push(friendStore.fetchKnownFriendSettings(accountId))
-  await Promise.allSettled(requests)
+    backgroundRequests.push(friendStore.fetchKnownFriendSettings(accountId))
+  await Promise.allSettled(backgroundRequests)
 }
-
 useIntervalFn(() => {
   clockNow.value = Date.now()
   for (const gid of expandedFriends.value) {
