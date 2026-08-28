@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ActivityTab } from '@/components/activity/BottomNav.vue'
 import type { ActivityDirectoryItemDto, ActivityGameplayKey, ShopGoodsDto } from '@/stores/activity-center'
-import { useNotification } from 'naive-ui'
+import { useNotification } from 'naive-ui/es/notification'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -23,7 +23,7 @@ const accountStore = useAccountStore()
 const activityStore = useActivityCenterStore()
 const friendStore = useFriendStore()
 const { currentAccountId } = storeToRefs(accountStore)
-const { activities, season, shop, solarTerms, constellation, qixi, qingMei, weather, actions, tabBadges, loading, error, actionError, notice, loadedAccountId, serverClockOffset, pendingActions } = storeToRefs(activityStore)
+const { activities, season, shop, solarTerms, constellation, qixi, qingMei, weather, actions, tabBadges, loading, error, actionError, notice, loadedAccountId, serverClockOffset, pendingActions, weatherFriendsLoading, weatherFriendInspectingGid } = storeToRefs(activityStore)
 const { friends, loading: friendsLoading } = storeToRefs(friendStore)
 const activeTab = ref<ActivityTab>('travel')
 const selectedActivity = ref<ActivityGameplayKey | null>(null)
@@ -191,9 +191,13 @@ async function openActivity(activity: ActivityDirectoryItemDto) {
   if (gameplay.module.key === 'stellar')
     activeTab.value = gameplay.entryTab as ActivityTab
   selectedActivity.value = gameplay.module.key
-  await activityStore.loadDetails(accountId(), gameplay.module.key)
-  if ((gameplay.module.key === 'qixi' || gameplay.module.key === 'weather') && currentAccountId.value)
+  const detailsLoaded = await activityStore.loadDetails(accountId(), gameplay.module.key)
+  if (gameplay.module.key === 'qixi' && currentAccountId.value) {
     await friendStore.fetchFriends(String(currentAccountId.value))
+  }
+  else if (gameplay.module.key === 'weather' && currentAccountId.value && detailsLoaded) {
+    void activityStore.loadWeatherFriends(String(currentAccountId.value))
+  }
 }
 function goBack() {
   if (selectedActivity.value) {
@@ -235,6 +239,9 @@ function lightWeatherResearch(nodeId: string) {
 function buyWeatherBottle() {
   activityStore.buyWeatherBottle(accountId(), 1)
 }
+function inspectWeatherFriend(friendGid: string) {
+  void activityStore.inspectWeatherFriend(accountId(), friendGid)
+}
 function collectWeatherBottle(targetGid: string) {
   activityStore.collectWeatherBottle(accountId(), targetGid)
 }
@@ -249,8 +256,11 @@ async function refreshQixiActivity() {
   await activityStore.loadDetails(accountId(), 'qixi')
 }
 async function refreshSelectedActivity() {
-  if (selectedActivity.value)
-    await activityStore.loadDetails(accountId(), selectedActivity.value)
+  if (!selectedActivity.value)
+    return
+  await activityStore.loadDetails(accountId(), selectedActivity.value)
+  if (selectedActivity.value === 'weather')
+    await activityStore.loadWeatherFriends(accountId())
 }
 function selectShopGoods(goods: ShopGoodsDto) {
   selectedShopGoods.value = goods
@@ -513,13 +523,15 @@ onUnmounted(() => {
       <main class="activity-content gameplay-content">
         <WeatherActivityView
           :activity="weather"
-          :friends="friends"
           :pending-research="pendingActions.lightWeatherResearch"
           :pending-buy="pendingActions.buyWeatherBottle"
           :pending-collect="pendingActions.collectWeatherBottle"
           :pending-summon="pendingActions.summonWeatherRain"
+          :inspecting-gid="weatherFriendInspectingGid"
+          :loading-friends="weatherFriendsLoading"
           @light="lightWeatherResearch"
           @buy="buyWeatherBottle"
+          @inspect="inspectWeatherFriend"
           @collect="collectWeatherBottle"
           @summon="summonWeatherRain"
         />
