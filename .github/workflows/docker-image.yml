@@ -35,7 +35,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # GitHub 自动提供的密钥，你什么都不用管
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # 4. 配置 Docker 编译环境
       - name: Set up Docker Buildx
@@ -49,6 +49,6 @@ jobs:
           file: core/Dockerfile   # 针对这个项目特殊的 Dockerfile 路径
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
-          # 开启 GitHub Action 免费云端缓存，下次编译起飞！
+          # 开启 GitHub Action 免费云端缓存
           cache-from: type=gha
           cache-to: type=gha,mode=max
