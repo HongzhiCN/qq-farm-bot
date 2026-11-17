@@ -108,6 +108,7 @@ let isRunning: boolean = false;
 let loginReady: boolean = false;
 let appliedConfigRevision: number = 0;
 let unifiedSchedulerRunning: boolean = false;
+let unifiedTickGeneration: number | null = null;
 let farmTaskRunning: boolean = false;
 let nextFarmRunAt: number = 0;
 let friendTaskRunning: boolean = false;
@@ -128,14 +129,28 @@ let runtimeGeneration: number = 0;
 let lastDailyRunDate: string = '';
 let ranchRoutineQueued = false;
 
-function runRanchRoutine(detached = false): Promise<void> {
-    if (ranchRoutineQueued || !loginReady) return Promise.resolve();
+function ranchNextRunAt(): number {
+    if (ranchRoutineQueued) return Infinity;
     const state = ranchAutomation.getRoutineState();
-    if (state.doneToday || Date.now() < state.nextCheckAt) return Promise.resolve();
+    return state.doneToday ? Infinity : state.nextCheckAt;
+}
+
+function runRanchRoutine(detached = false): Promise<void> {
+    if (!loginReady || Date.now() < ranchNextRunAt()) return Promise.resolve();
+    const generation = runtimeGeneration;
     ranchRoutineQueued = true;
     return runExclusiveAutomationTask('ranch_routine', async () => {
-        if (loginReady) await ranchAutomation.run();
-    }, { detached }).finally(() => { ranchRoutineQueued = false; });
+        if (!loginReady || generation !== runtimeGeneration) return;
+        const state = ranchAutomation.getRoutineState();
+        if (state.doneToday || Date.now() < state.nextCheckAt) return;
+        await ranchAutomation.run({ farmDeadline: () => Math.min(
+            nextFarmRunAt || Infinity,
+            friendTaskRunning ? Date.now() : nextFriendRunAt || Infinity,
+        ) });
+    }, { detached }).finally(() => {
+        ranchRoutineQueued = false;
+        scheduleUnifiedNextTick();
+    });
 }
 const workerScheduler = createScheduler('worker');
 
@@ -351,33 +366,41 @@ async function runUnifiedTick(): Promise<void> {
     const now = Date.now();
     const dueFarm = now >= nextFarmRunAt;
     const dueFriend = now >= nextFriendRunAt;
-    if (!dueFarm && !dueFriend) return;
+    if (!dueFarm && !dueFriend && now < ranchNextRunAt()) return;
 
     const auto = getAutomation();
     // 好友按单次访问持锁，等待间隔不阻塞后续农场巡查。
     if (dueFarm) await runExclusiveAutomationTask('farm_tick', () => runFarmTick(auto));
     if (!unifiedSchedulerRunning || !loginReady || generation !== runtimeGeneration) return;
     if (dueFriend && !friendTaskRunning) void runFriendTick(auto);
+    void runRanchRoutine(true).catch((error: any) => logWarn('牧场', `牧场例程失败：${error.message}`));
 }
 
 function scheduleUnifiedNextTick(): void {
     if (!unifiedSchedulerRunning) return;
+    // 牧场离场可提前唤醒，但正在等待连接的农场巡查不能再排一轮。
+    if (unifiedTickGeneration === runtimeGeneration) return;
     workerScheduler.clear('unified_next_tick');
     if (!loginReady) return;
 
     const now = Date.now();
     const nextAt = Math.min(
         farmTaskRunning ? Number.POSITIVE_INFINITY : (Number(nextFarmRunAt) || (now + 1000)),
-        friendTaskRunning ? Number.POSITIVE_INFINITY : (Number(nextFriendRunAt) || (now + 1000))
+        friendTaskRunning ? Number.POSITIVE_INFINITY : (Number(nextFriendRunAt) || (now + 1000)),
+        ranchNextRunAt(),
     );
     if (!Number.isFinite(nextAt)) return;
     const delayMs = Math.max(1000, nextAt - now); // 最低 1 秒
 
+    const generation = runtimeGeneration;
     workerScheduler.setTimeoutTask('unified_next_tick', delayMs, async () => {
+        if (generation !== runtimeGeneration || !unifiedSchedulerRunning || unifiedTickGeneration === generation) return;
+        unifiedTickGeneration = generation;
         try {
             await runUnifiedTick();
         } finally {
-            scheduleUnifiedNextTick();
+            if (unifiedTickGeneration === generation) unifiedTickGeneration = null;
+            if (generation === runtimeGeneration) scheduleUnifiedNextTick();
         }
     });
 }
@@ -991,6 +1014,9 @@ async function handleApiCall(msg: any): Promise<void> {
                 case 'getDailyGiftOverview':
                     result = await getDailyGiftOverview(args[0] === true);
                     break;
+                case 'getRanchActivityDirectorySnapshot':
+                    result = await require('../services/activity-center').getRanchActivityDirectorySnapshot();
+                    break;
                 case 'getActivityDirectorySnapshot':
                     result = await require('../services/activity-center').getActivityDirectorySnapshot();
                     break;
@@ -1114,6 +1140,12 @@ async function handleApiCall(msg: any): Promise<void> {
                 case 'getAutumnActivity':
                     result = await require('../services/autumn-activities').getAutumnActivity(args[0]);
                     break;
+                case 'getMugeActivity':
+                    result = await require('../services/muge-activity').getMugeActivity();
+                    break;
+                case 'operateMugeActivity':
+                    result = await require('../services/muge-activity').operateMugeActivity(args[0], args[1]);
+                    break;
                 case 'getMilkTeaActivity':
                     result = await require('../services/milk-tea').getMilkTeaActivity(args[0], args[1]);
                     break;
@@ -1193,7 +1225,7 @@ async function getDailyGiftOverview(propagateErrors: boolean = false): Promise<a
             currentTask: growthTask.currentTask || null,
             tasks: Array.isArray(growthTask.tasks) ? growthTask.tasks : [],
         },
-        ranch: require('../services/ranch/daily').getOverview(!!auto.ranch_task, !!auto.ranch_share),
+        ranch: require('../services/ranch/daily').getOverview(!!auto.ranch_task, !!auto.ranch_share, !!auto.ranch_daily_benefit),
         gifts: [
             {
                 key: 'task_claim',
