@@ -8,6 +8,7 @@ export interface AutomationConfig {
   ranch_buy?: boolean
   ranch_upgrade?: boolean
   ranch_sell?: boolean
+  ranch_market_organic?: boolean
   ranch_grass?: boolean
   ranch_grass_buy?: boolean
   ranch_grass_threshold_percent?: number
@@ -27,6 +28,8 @@ export interface AutomationConfig {
   ranch_bag_fallback?: string
   ranch_coop_animal?: number
   ranch_shed_animal?: number
+  ranch_coop_cub_priority?: number[]
+  ranch_shed_cub_priority?: number[]
   farm?: boolean
   farm_harvest_tiangong?: boolean
   farm_push?: boolean
